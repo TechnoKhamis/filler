@@ -4,46 +4,49 @@ use crate::shape::Shape;
 pub fn find_valid_placements(
     grid: &Grid,
     shape: &Shape,
-    player_id: u8
+    _player_id: u8
 ) -> Vec<(usize, usize)> {
     let mut valid_positions: Vec<(usize, usize)> = Vec::new();
 
-    // OPTIMIZATION: Find player's territory first
-    let mut my_positions: Vec<(usize, usize)> = Vec::new();
-    for r in 0..grid.rows {
-        for c in 0..grid.cols {
-            if grid.cells[r][c] == CellType::Mine {
-                my_positions.push((r, c));
-            }
-        }
-    }
-
-    // CRITICAL FIX: Only search within radius of existing territory
-    let search_radius = 10; // Adjust this if needed
-    let mut candidates: Vec<(usize, usize)> = Vec::new();
-
-    for &(my_r, my_c) in &my_positions {
-        for dr in -(search_radius as isize)..=(search_radius as isize) {
-            for dc in -(search_radius as isize)..=(search_radius as isize) {
-                let r = (my_r as isize + dr).max(0) as usize;
-                let c = (my_c as isize + dc).max(0) as usize;
-
-                // Check if shape fits
-                if r + shape.height <= grid.rows && c + shape.width <= grid.cols {
-                    candidates.push((r, c));
+    // For small boards, just check everything
+    if grid.rows * grid.cols <= 10000 {
+        let max_row = grid.rows.saturating_sub(shape.height) + 1;
+        let max_col = grid.cols.saturating_sub(shape.width) + 1;
+        
+        for row in 0..max_row {
+            for col in 0..max_col {
+                if is_valid_placement(grid, shape, row, col) {
+                    valid_positions.push((row, col));
                 }
             }
         }
+        return valid_positions;
     }
 
-    // Remove duplicates
-    candidates.sort_unstable();
-    candidates.dedup();
-
-    // Now check only these candidates
-    for (row, col) in candidates {
-        if is_valid_placement(grid, shape, row, col, player_id) {
-            valid_positions.push((row, col));
+    // For large boards, search near our territory only
+    let mut checked = vec![vec![false; grid.cols]; grid.rows];
+    
+    for r in 0..grid.rows {
+        for c in 0..grid.cols {
+            if grid.cells[r][c] == CellType::Mine {
+                // Check positions where piece could overlap this cell
+                for &(dy, dx) in &shape.cells {
+                    if r >= dy && c >= dx {
+                        let top = r - dy;
+                        let left = c - dx;
+                        
+                        if top + shape.height <= grid.rows 
+                            && left + shape.width <= grid.cols 
+                            && !checked[top][left] 
+                        {
+                            checked[top][left] = true;
+                            if is_valid_placement(grid, shape, top, left) {
+                                valid_positions.push((top, left));
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -55,37 +58,28 @@ fn is_valid_placement(
     shape: &Shape,
     top_row: usize,
     left_col: usize,
-    player_id: u8
 ) -> bool {
     let mut my_overlap_count = 0;
 
-    // Check each cell of the shape
     for &(dy, dx) in &shape.cells {
         let row = top_row + dy;
         let col = left_col + dx;
 
-        // Check bounds
         if row >= grid.rows || col >= grid.cols {
             return false;
         }
 
-        // Check what's at this position
         match grid.cells[row][col] {
-            CellType::Enemy => {
-                return false;  // Touching enemy!
-            }
+            CellType::Enemy => return false,
             CellType::Mine => {
                 my_overlap_count += 1;
                 if my_overlap_count > 1 {
-                    return false;  // Too many overlaps!
+                    return false;
                 }
             }
-            CellType::Empty => {
-                // Empty is fine
-            }
+            CellType::Empty => {}
         }
     }
 
-    // Must overlap EXACTLY 1
     my_overlap_count == 1
 }
