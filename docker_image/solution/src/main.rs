@@ -1,13 +1,13 @@
 mod input;
 mod grid;
 mod shape;
-mod placements;  // ← ADD THIS!
+mod placements;
 
 use std::io::{self, BufRead, Write};
 use crate::grid::grid::Grid;
 use crate::shape::Shape;
-use crate::placements::validator::find_valid_placements;  // ← ADD THIS!
-use crate::placements::strategy::choose_best_placement;   // ← ADD THIS!
+use crate::placements::validator::find_valid_placements;
+use crate::placements::strategy::choose_best_placement;
 
 fn main() {
     let stdin = io::stdin();
@@ -18,7 +18,6 @@ fn main() {
         match lines.next() {
             Some(Ok(line)) => {
                 if let Some(num) = input::reader::get_player_id(&line) {
-                    eprintln!("[DEBUG] I am player {}", num);
                     break num;
                 }
             }
@@ -71,12 +70,9 @@ fn main() {
         let grid = match Grid::from_lines(&board_lines, player_id) {
             Some(g) => g,
             None => {
-                eprintln!("[ERROR] Failed to parse grid!");
                 return;
             }
         };
-
-        eprintln!("[DEBUG] Grid: {}x{}", grid.rows, grid.cols);
 
         // Collect piece lines
         let mut piece_lines: Vec<String> = Vec::new();
@@ -109,29 +105,19 @@ fn main() {
         let shape = match Shape::from_lines(&piece_lines) {
             Some(s) => s,
             None => {
-                eprintln!("[ERROR] Failed to parse shape!");
                 return;
             }
         };
 
-        eprintln!("[DEBUG] Shape: {}x{}, {} cells", 
-            shape.width, shape.height, shape.cells.len());
-
         // ========== FIND VALID PLACEMENTS ==========
         
         let valid_positions = find_valid_placements(&grid, &shape, player_id);
-        
-        eprintln!("[DEBUG] Found {} valid positions", valid_positions.len());
 
         // ========== CHOOSE BEST PLACEMENT ==========
         
         let (best_row, best_col) = match choose_best_placement(&grid, &shape, &valid_positions, player_id) {
-            Some(pos) => {
-                eprintln!("[DEBUG] Chose position: {:?}", pos);
-                pos
-            }
+            Some(pos) => pos,
             None => {
-                eprintln!("[ERROR] No valid placements!");
                 (0, 0)  // Fallback
             }
         };

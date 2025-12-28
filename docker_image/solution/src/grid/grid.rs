@@ -1,4 +1,4 @@
-// src/grid.rs
+// src/grid/grid.rs
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum CellType {
